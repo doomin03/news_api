@@ -16,7 +16,7 @@ class Youtube_Video_Collecter(object):
     def __init__(self) -> None:
         self.url = "https://www.youtube.com"
         chrome_options = Options()
-        # chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--headless")
     
         # 브라우저 설정 최적화
         chrome_options.add_argument("--no-sandbox")  # 샌드박스 비활성화
@@ -42,10 +42,10 @@ class Youtube_Video_Collecter(object):
         
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-        self.wait = WebDriverWait(self.driver, 5)
+        self.wait = WebDriverWait(self.driver, 15)
 
     def get_Profile(self,name:str)->dict:
-        ouput_Profile = {
+        result = {
             "name" : None,
             "imag" : None,
             "fans" : None,
@@ -66,38 +66,82 @@ class Youtube_Video_Collecter(object):
         
         try:
             channel_name = channel.find_element(By.XPATH, "//*[@id='channel-title'] //*[@id='text']")
-            ouput_Profile['name'] = channel_name.text
+            result['name'] = channel_name.text
 
             channel_imag = channel.find_element(By.XPATH, "//*[@id='avatar-section'] //*[@id='avatar']/yt-img-shadow //*[@id='img']")
-            ouput_Profile['imag'] = channel_imag.get_attribute("src")
+            result['imag'] = channel_imag.get_attribute("src")
 
             channel_fans = channel.find_element(By.XPATH, "//*[@id='info-section'] //*[@id='video-count']")
-            ouput_Profile['fans'] = channel_fans.text
+            result['fans'] = channel_fans.text
 
             channel_id = channel.find_element(By.XPATH, " //*[@id='info-section'] //*[@id='main-link']")
-            ouput_Profile['id'] = channel_id.get_attribute('href')
+            result['id'] = channel_id.get_attribute('href')
         except:
-            print(ouput_Profile)
+            print(result)
             self.driver.close()
             return
         
-        return ouput_Profile
+        return result
+    
+    def get_video(self, p_id:str)->dict:
+        result:dict = {
+            "title" : None,
+            "img" : None,
+            "url" : None,
+        }
 
+        title_arr:list = []
+
+        img_arr:list = []
+
+        url_arr:list = []
+
+        url:str = self.url + p_id + "/videos"
+        
+        self.driver.get(url)
+        for i in range(1,7):
+            try:
+            
+                videos_row = self.wait.until(
+                    EC.visibility_of_element_located((By.XPATH, f"//*[@id='contents']/ytd-rich-grid-row[{i}]"))
+                )
+                titles:list = videos_row.find_elements(By.CSS_SELECTOR ,"#video-title")
+                for title in titles:
+                    title_arr.append(title.text)
+                
+                imgs:list = videos_row.find_elements(By.CSS_SELECTOR ,"#thumbnail > yt-image > img")
+                for img in imgs:
+                    img_arr.append(img.get_attribute("src"))
+                
+                urls:list = videos_row.find_elements(By.CSS_SELECTOR ,"#video-title-link")
+                for url in urls:
+                    url_arr.append(url.get_attribute("href"))
+
+                result["title"] = title_arr
+                result["img"] = img_arr
+                result["url"] = url_arr
+            except:
+                import traceback
+                e = traceback.format_exc()
+
+           
+        return result
+
+
+
+
+    def download_video(self, url:str, path:str)->dict:
+        result:dict = {
+            "code" : None,
+            "error" : None
+        }
+
+
+
+    
 
     def close(self):
         self.driver.close()
-
-    
-        
-        
-
-
-
-
-
-
-
-
 
 
 
@@ -130,9 +174,9 @@ class youtube_search(Resource):
 
 def main():
     dd = Youtube_Video_Collecter()
-    ddd = dd.get_Profile("괴물쥐")
-    dd.close()
-    print(ddd)
+    print(dd.get_video("/@wkdwlghks"))
+    
+    
 
 if __name__ == "__main__":
     main()
