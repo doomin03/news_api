@@ -11,6 +11,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support import expected_conditions as EC
 
+from pytube import YouTube
+from pytube.exceptions import VideoUnavailable
+
+import os
 
 class Youtube_Video_Collecter(object):
     def __init__(self) -> None:
@@ -135,7 +139,23 @@ class Youtube_Video_Collecter(object):
             "code" : None,
             "error" : None
         }
+        
+        try:
+            video = YouTube(url=url)
 
+            video_title = video.title
+
+            video_directory = os.path.join(path, video_title)
+
+            if not os.path.exists(video_directory):
+                os.makedirs(video_directory)
+
+            video_stream = video.streams.get_highest_resolution()
+
+            video_stream.download(output_path=video_directory)
+
+        except VideoUnavailable as vu:
+            print
 
 
     
@@ -173,8 +193,7 @@ class youtube_search(Resource):
             
 
 def main():
-    dd = Youtube_Video_Collecter()
-    print(dd.get_video("/@wkdwlghks"))
+    print()
     
     
 
