@@ -51,7 +51,7 @@ class Youtube_Video_Collecter(object):
     def get_Profile(self,name:str)->dict:
         result = {
             "name" : None,
-            "imag" : None,
+            "icon" : None,
             "fans" : None,
             "id" : None
         }
@@ -72,8 +72,8 @@ class Youtube_Video_Collecter(object):
             channel_name = channel.find_element(By.XPATH, "//*[@id='channel-title'] //*[@id='text']")
             result['name'] = channel_name.text
 
-            channel_imag = channel.find_element(By.XPATH, "//*[@id='avatar-section'] //*[@id='avatar']/yt-img-shadow //*[@id='img']")
-            result['imag'] = channel_imag.get_attribute("src")
+            channel_icon = channel.find_element(By.XPATH, "//*[@id='avatar-section'] //*[@id='avatar']/yt-img-shadow //*[@id='img']")
+            result['icon'] = channel_icon.get_attribute("src")
 
             channel_fans = channel.find_element(By.XPATH, "//*[@id='info-section'] //*[@id='video-count']")
             result['fans'] = channel_fans.text
@@ -100,7 +100,7 @@ class Youtube_Video_Collecter(object):
 
         url_arr:list = []
 
-        url:str = self.url + p_id + "/videos"
+        url:str = p_id + "/videos"
         
         self.driver.get(url)
         for i in range(1,7):
@@ -135,28 +135,37 @@ class Youtube_Video_Collecter(object):
 
 
     def download_video(self, url:str, path:str)->dict:
-        result:dict = {
-            "code" : None,
-            "error" : None
+        result = {
+            "code": None,
+            "error": None
         }
         
         try:
-            video = YouTube(url=url)
+            video = YouTube(url)
+            video_title = video.title.strip().replace(' ', '_') 
+            video_directory = os.path.join(path.strip(), video_title) 
 
-            video_title = video.title
+            
+            if os.name == 'nt': 
+                video_directory = video_directory.replace('\\', '/')
 
-            video_directory = os.path.join(path, video_title)
+            # 디렉토리가 유니코드를 처리할 수 있도록 함
+            video_directory = os.path.normpath(video_directory)
 
             if not os.path.exists(video_directory):
                 os.makedirs(video_directory)
 
             video_stream = video.streams.get_highest_resolution()
-
             video_stream.download(output_path=video_directory)
-
-        except VideoUnavailable as vu:
-            print
-
+            result["code"] = "Success"
+        except VideoUnavailable as e:
+            result["code"] = "Failed"
+            result["error"] = str(e)
+        except Exception as e:
+            result["code"] = "Failed"
+            result["error"] = str(e)
+        
+        return result
 
     
 
@@ -169,32 +178,84 @@ app = Flask(__name__)
 
 api = Api(app=app, title='youtube')
 
-parser = reqparse.RequestParser()
-parser.add_argument('name', type=str, required=True)
+search_parser = reqparse.RequestParser()
+search_parser.add_argument('title', type=str, required=True)
 
-ns_search = api.namespace('youtube_api')
+ns_youtube = api.namespace('youtube')
 
-input_model = api.model('download', {
-    "url" :  fields.String(required=True),
-    "path" : fields.String(required=True) 
-})
 
-@ns_search.route('/search')
+
+@ns_youtube.route('/search')
 class youtube_search(Resource):
-    @ns_search.expect(parser)
-    def get(self):
+    @ns_youtube.expect(search_parser)
+    def get(self)->jsonify:
+        result = {}
         try:
-            args = parser.parse_args()
-            name = args['name']
+            args = search_parser.parse_args()
+            name = args['title']
+
+            collecter = Youtube_Video_Collecter()
+
+            result = collecter.get_Profile(name=name)
 
         except:
             import traceback
             e = traceback.format_exc()
+            return jsonify()
             
+        return jsonify(result)
+    
+video_parser = reqparse.RequestParser()
+video_parser.add_argument("id", type=str, required=True)
+
+@ns_youtube.route('/videos')
+class youtube_get_videos(Resource):
+    @ns_youtube.expect(video_parser)
+    def get(self)->jsonify:
+        result:dict = { }
+        try:
+            args = video_parser.parse_args()
+            id = args["id"]
+
+            collecter = Youtube_Video_Collecter()
+            
+            result = collecter.get_video(p_id=id)
+
+        except:
+            import traceback
+            e = traceback.format_exc()
+        
+        return jsonify(result)
+
+
+download_parser = reqparse.RequestParser()
+download_parser.add_argument("url", type=str, required=True)
+download_parser.add_argument("path", type=str, required=True)
+
+@ns_youtube.route("/download")
+class youtube_download_videos(Resource):
+    @ns_youtube.expect(download_parser)
+    def get(self)->jsonify:
+        result = {}
+
+        try:
+            args = download_parser.parse_args()
+            url = args["url"]
+            path = args["path"]
+
+            collecter = Youtube_Video_Collecter()
+
+            result = collecter.download_video(url=url, path=path)
+
+        except:
+            import traceback
+            e = traceback.format_exc()
+
+        return jsonify(result)
+
 
 def main():
-    print()
-    
+    app.run()
     
 
 if __name__ == "__main__":
