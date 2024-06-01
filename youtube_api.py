@@ -177,6 +177,7 @@ class Youtube_Video_Collecter(object):
 app = Flask(__name__)
 
 api = Api(app=app, title='youtube')
+CORS(app)
 
 search_parser = reqparse.RequestParser()
 search_parser.add_argument('title', type=str, required=True)
